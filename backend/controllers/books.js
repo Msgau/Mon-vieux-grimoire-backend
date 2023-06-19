@@ -65,14 +65,12 @@ exports.modifyBook = (req, res, next) => {
 
 
 exports.getOneBook = (req, res, next) => {
-  console.log(Book)
     Book.findOne({ _id: req.params.id })
       .then(book => res.status(200).json(book))
       .catch(error => res.status(404).json({ error }));
 };
 
 exports.getAllBooks = (req, res, next) => {
-  console.log("test");
     Book.find()
       .then(books => res.status(200).json(books))
       .catch(error => res.status(400).json({ error }));
@@ -80,20 +78,15 @@ exports.getAllBooks = (req, res, next) => {
 
 exports.bestRating = async (req, res, next) => {
   try {
-    const books = await Book.find()
-      .sort({ averageRating: -1 }) // Tri des livres par ordre décroissant de la note moyenne
-      .limit(3) // Limite le nombre de livres renvoyés à 3
+    const books = await Book.find() // On cherche tous les livres
+      .sort({ averageRating: -1 }) // On les trie par ordre décroissant en fonction de leur averageRating
+      .limit(3) // On limite à 3
 
     res.status(200).json(books)
   } catch (error) {
     res.status(500).json({ error })
   }
 }
-
-exports.toto = (req, res, next) => {
-  const books = Book.find().sort({ averageRating: -1 }).limit(3);
-  res.send(books);
-};
 
 exports.deleteBook = (req, res, next) => {
   Book.findOne({ _id: req.params.id })
