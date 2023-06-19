@@ -23,25 +23,35 @@ exports.createBook = (req, res, next) => {
     });
 };
 
-exports.modifyBook = (req, res, next) => {
-  const bookObject = req.file
+exports.modifyBook = (req, res, next) => { 
+  const bookObject = req.file // On crée un objet bookObject qui regarde si la requête est faite avec un fichier (req.file) ou pas.
     ? {
-        ...JSON.parse(req.body.book),
-        imageUrl: `${req.protocol}://${req.get("host")}/images/${
-          req.file.filename
-        }`,
+        ...JSON.parse(req.body.book), // S'il existe, on traite la nouvelle image. On récupère l'objet en parsant la chaine de caractère...
+        imageUrl: `${req.protocol}://${req.get("host")}/images/${req.file.filename}`, // Et en recréant l'url de l'image comme pour le post.
       }
-    : { ...req.body };
+    : { ...req.body }; // S'il n'y a pas d'objet de transmis, on récupère l'objet dans le corps de la requête.
 
-  delete bookObject._userId;
-  Book.findOne({ _id: req.params.id })
+  delete bookObject._userId; // on supprime l'userID provenant de la requête pour pas qu'il le modifie en le réassignant à un autre user
+  Book.findOne({ _id: req.params.id }) // On cherche l'objet dans notre bdd pour vérifier si c'est bien l'utilisateur qui a créé l'objet qui veut le modifier.
     .then((book) => {
-      if (book.userId != req.auth.userId) {
-        res.status(401).json({ message: "Not authorized" });
-      } else {
+      if (book.userId != req.auth.userId) { // Si ça match pas, erreur
+        res.status(401).json({ message: "Not authorized" }); 
+      } else { // Si ça marche, on met à jour notre enregistrement
+        
+        // Supprimer l'ancienne image si elle existe
+        if (book.imageUrl) { // Si le livre présent dans la bdd a une url d'image
+          const filename = book.imageUrl.split("/images/")[1]; // On utilise split comme dans la fonction delete pour recréer le chemin dans notre système de fichier à partir de l'url de l'ancienne image
+          fs.unlink(`images/${filename}`, (err) => { // On utilise la méthode unlink de fs (file system, un package node) avec notre chemin pour supprimer l'ancienne image
+            if (err) {
+              console.error(err);
+            }
+          });
+        }
+        
+        // La méthode updateOne permet de modifier un Thing dans la bdd. 
         Book.updateOne(
-          { _id: req.params.id },
-          { ...bookObject, _id: req.params.id }
+          { _id: req.params.id }, // On commence par comparer les id pour savoir quel objet on modifie.
+          { ...bookObject, _id: req.params.id } // Le deuxième argument, { ...req.body, _id: req.params.id }, est la nouvelle version de l'objet, et on s'assure que l'id est bien celui qui est dans le corps de la requête.
         )
           .then(() => res.status(200).json({ message: "Objet modifié!" }))
           .catch((error) => res.status(401).json({ error }));
@@ -51,6 +61,8 @@ exports.modifyBook = (req, res, next) => {
       res.status(400).json({ error });
     });
 };
+
+
 
 exports.getOneBook = (req, res, next) => {
   console.log(Book)
@@ -66,9 +78,9 @@ exports.getAllBooks = (req, res, next) => {
       .catch(error => res.status(400).json({ error }));
 };
 
-exports.bestRating = (req, res, next) => {
+exports.bestRating = async (req, res, next) => {
   try {
-    const books = Book.find()
+    const books = await Book.find()
       .sort({ averageRating: -1 }) // Tri des livres par ordre décroissant de la note moyenne
       .limit(3) // Limite le nombre de livres renvoyés à 3
 
