@@ -1,33 +1,63 @@
 const Book = require('../models/Book');
 const fs = require('fs');
+const sharp = require('sharp');
+
+const convertImageToWebP2 = async (inputPath, outputPath, callback) => {
+  await sharp(inputPath)
+    .webp({ quality: 90 })
+    .toFile(outputPath, (err, info) => {
+      if (err) {
+        console.error(err);
+        return callback(err);
+      }
+      // Supprimer le fichier d'origine après la conversion
+      fs.unlink(inputPath, (err) => {
+        if (err) {
+          console.error(err);
+          return callback(err);
+        }
+        callback(null, info);
+      });
+    });
+};
 
 exports.createBook = (req, res, next) => {
   const bookObject = JSON.parse(req.body.book);
-  delete bookObject._id;
+  delete bookObject._id; // On vire l'id du post parce que sinon ça va pas matcher avec le fichier Book.js
   delete bookObject._userId;
-  const book = new Book({
-    ...bookObject,
-    userId: req.auth.userId,
-    imageUrl: `${req.protocol}://${req.get("host")}/images/${
-      req.file.filename
-    }`,
-  });
 
-  book
-    .save()
-    .then(() => {
-      res.status(201).json({ message: "Objet enregistré !" });
-    })
-    .catch((error) => {
-      res.status(400).json({ error });
+  convertImageToWebP2(req.file.path, `${req.file.path}.webp`, (err, info) => {
+    if (err) {
+      console.error(err);
+      return res
+        .status(500)
+        .json({ error: "Erreur lors de la conversion de l'image" });
+    }
+
+    const book = new Book({
+      ...bookObject, // L'opérateur spread ... est utilisé pour faire une copie de tous les éléments de bookObject (req.body moins les deux champs supprimés). 
+      userId: req.auth.userId,
+      imageUrl: `${req.protocol}://${req.get("host")}/images/${req.file.filename}.webp`, // On génère l'URL avec le protocole, le nom d'hôte, et la route avec le nom du fichier donné par multer
     });
+
+    book
+      .save() // La méthode save enregistre l'objet dans la base, et retourne un promise.
+      .then(() => { // On renvoie une réponse de réussite avec un code 201 de réussite.
+        res
+          .status(201)
+          .json({ message: "Objet enregistré !", imageUrl: book.imageUrl });
+      })
+      .catch((error) => {
+        res.status(400).json({ error });
+      });
+  });
 };
 
 exports.modifyBook = (req, res, next) => { 
   const bookObject = req.file // On crée un objet bookObject qui regarde si la requête est faite avec un fichier (req.file) ou pas.
     ? {
         ...JSON.parse(req.body.book), // S'il existe, on traite la nouvelle image. On récupère l'objet en parsant la chaine de caractère...
-        imageUrl: `${req.protocol}://${req.get("host")}/images/${req.file.filename}`, // Et en recréant l'url de l'image comme pour le post.
+        imageUrl: `${req.protocol}://${req.get("host")}/images/${req.file.filename}.webp`, // Et en recréant l'url de l'image comme pour le post.
       }
     : { ...req.body }; // S'il n'y a pas d'objet de transmis, on récupère l'objet dans le corps de la requête.
 
@@ -40,6 +70,7 @@ exports.modifyBook = (req, res, next) => {
         
         // Supprimer l'ancienne image si elle existe
         if (book.imageUrl) { // Si le livre présent dans la bdd a une url d'image
+          
           const filename = book.imageUrl.split("/images/")[1]; // On utilise split comme dans la fonction delete pour recréer le chemin dans notre système de fichier à partir de l'url de l'ancienne image
           fs.unlink(`images/${filename}`, (err) => { // On utilise la méthode unlink de fs (file system, un package node) avec notre chemin pour supprimer l'ancienne image
             if (err) {
@@ -61,7 +92,6 @@ exports.modifyBook = (req, res, next) => {
       res.status(400).json({ error });
     });
 };
-
 
 
 exports.getOneBook = (req, res, next) => {
