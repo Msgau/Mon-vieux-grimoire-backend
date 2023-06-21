@@ -23,7 +23,7 @@ const convertImageToWebP2 = async (inputPath, outputPath, callback) => {
 
 exports.createBook = (req, res, next) => {
   const bookObject = JSON.parse(req.body.book);
-  delete bookObject._id; // On vire l'id du post parce que sinon ça va pas matcher avec le fichier Book.js
+  delete bookObject._id; // On supprime l'id du post parce que sinon ça va pas matcher avec le fichier Book.js
   delete bookObject._userId;
 
   convertImageToWebP2(req.file.path, `${req.file.path}.webp`, (err, info) => {
@@ -95,13 +95,13 @@ exports.modifyBook = (req, res, next) => {
 
 
 exports.getOneBook = (req, res, next) => {
-    Book.findOne({ _id: req.params.id })
-      .then(book => res.status(200).json(book))
+    Book.findOne({ _id: req.params.id }) // On utilise findOne() dans notre modèle Book pour trouver le Book unique ayant le même _id que le paramètre de la requête
+      .then(book => res.status(200).json(book)) // On retourne au front-end une réponse 200 avec le book dedans
       .catch(error => res.status(404).json({ error }));
 };
 
 exports.getAllBooks = (req, res, next) => {
-    Book.find()
+    Book.find() // On utilise la méthode find() dans notre modèle Mongoose afin de renvoyer un tableau contenant tous les Book dans notre base de données
       .then(books => res.status(200).json(books))
       .catch(error => res.status(400).json({ error }));
 };
@@ -121,12 +121,12 @@ exports.bestRating = async (req, res, next) => {
 exports.deleteBook = (req, res, next) => {
   Book.findOne({ _id: req.params.id })
     .then((book) => {
-      if (book.userId != req.auth.userId) {
+      if (book.userId != req.auth.userId) { // On vérifie l'id comme pour le modify
         res.status(401).json({ message: "Not authorized" });
-      } else {
-        const filename = book.imageUrl.split("/images/")[1];
-        fs.unlink(`images/${filename}`, () => {
-          Book.deleteOne({ _id: req.params.id })
+      } else { // Si c'est le bon utilisateur, on supprime l'objet de la bdd, et l'image du système de fichier
+        const filename = book.imageUrl.split("/images/")[1]; // On récupère l'url enregistrée, et on recrée le chemin dans notre système de fichier à aprtir de celle-ci (l'inverse du post)
+        fs.unlink(`images/${filename}`, () => { // On utilise la méthode unlink de fs (file system, un package node) avec notre chemin pour supprimer l'ancienne image du serveur.
+          Book.deleteOne({ _id: req.params.id }) // On utilise la méthode deleteOne et on fait comme pour les autres.
             .then(() => {
               res.status(200).json({ message: "Objet supprimé !" });
             })
