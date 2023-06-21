@@ -143,7 +143,7 @@ exports.rateOneBook = async (req, res) => {
   try {
     const book = await Book.findOne({ _id: req.params.id });
 
-    // Vérification de l'user
+    // Vérification que l'ID de l'utilisateur dans la requête correspond à l'ID de l'utilisateur authentifié
     const user = req.body.userId;
     if (user !== req.auth.userId) {
       res
@@ -167,10 +167,10 @@ exports.rateOneBook = async (req, res) => {
       book.ratings.push(newRatingObject);
 
       // On calcule averageRating en fonction de toutes les notes.
-      const allRatings = book.ratings.map((rating) => rating.grade);
+      const allRatings = book.ratings.map((rating) => rating.grade); // On extrait toutes les notes (grade) des évaluations existantes (book.ratings) pour le livre donné. On utilise map() pour parcourir chaque évaluation et récupérer la note correspondante.
       const averageRating =
-        allRatings.reduce((acc, curr) => acc + curr, 0) / allRatings.length;
-      const newAverageRating = averageRating.toFixed(1);
+        allRatings.reduce((acc, curr) => acc + curr, 0) / allRatings.length; // On calcule la note moyenne : la méthode reduce permet d'additionner toutes les notes. acc conserve l'accumulation des notes, et à chaque id on y ajoute une nouvelle note avec curr
+      const newAverageRating = averageRating.toFixed(1); // On utilise la méthode toFixed pour arrondir la note à 1 décimale après la virgule
 
       // Mise à jour du livre avec les nouveaux champs de note et de note moyenne
       await Book.updateOne(
@@ -180,7 +180,7 @@ exports.rateOneBook = async (req, res) => {
           averageRating: newAverageRating,
           _id: req.params.id,
         },
-        { new: true }
+        { new: true } // On demande à mongoDB de renvoyer le document mis à jour après la modification.
       );
 
       // Recherche du livre mis à jour pour obtenir les dernières valeurs
