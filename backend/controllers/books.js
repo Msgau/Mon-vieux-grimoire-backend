@@ -1,38 +1,14 @@
 const Book = require('../models/Book');
 const fs = require('fs');
-const sharp = require('sharp');
-
-const convertImageToWebP2 = async (inputPath, outputPath, callback) => {
-  await sharp(inputPath)
-    .webp({ quality: 90 })
-    .toFile(outputPath, (err, info) => {
-      if (err) {
-        console.error(err);
-        return callback(err);
-      }
-      // Supprimer le fichier d'origine après la conversion
-      fs.unlink(inputPath, (err) => {
-        if (err) {
-          console.error(err);
-          return callback(err);
-        }
-        callback(null, info);
-      });
-    });
-};
 
 exports.createBook = (req, res, next) => {
   const bookObject = JSON.parse(req.body.book);
   delete bookObject._id; // On supprime l'id du post parce que sinon ça va pas matcher avec le fichier Book.js
   delete bookObject._userId;
 
-  convertImageToWebP2(req.file.path, `${req.file.path}.webp`, (err, info) => {
-    if (err) {
-      console.error(err);
-      return res
-        .status(500)
-        .json({ error: "Erreur lors de la conversion de l'image" });
-    }
+  if (isNaN(bookObject.year)) {
+    return res.status(400).json({ error: "Le champ 'year' doit être un nombre" });
+  }
 
     const book = new Book({
       ...bookObject, // L'opérateur spread ... est utilisé pour faire une copie de tous les éléments de bookObject (req.body moins les deux champs supprimés). 
@@ -50,12 +26,16 @@ exports.createBook = (req, res, next) => {
       .catch((error) => {
         res.status(400).json({ error });
       });
-  });
 };
 
 exports.modifyBook = (req, res, next) => { 
+  // Vérifier si la conversion a réussi
+  if (!req.file || !req.file.path || !req.file.path.endsWith('.webp')) {
+    return res.status(500).json({ error: "Erreur lors de la conversion de l'image" });
+  }
   const bookObject = req.file // On crée un objet bookObject qui regarde si la requête est faite avec un fichier (req.file) ou pas.
     ? {
+      
         ...JSON.parse(req.body.book), // S'il existe, on traite la nouvelle image. On récupère l'objet en parsant la chaine de caractère...
         imageUrl: `${req.protocol}://${req.get("host")}/images/${req.file.filename}.webp`, // Et en recréant l'url de l'image comme pour le post.
       }
