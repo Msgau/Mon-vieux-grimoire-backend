@@ -5,7 +5,7 @@ const auth = require('../middleware/auth');
 const multer = require('../middleware/multer-config');
 const convertImageToWebP = require("../middleware/sharp-config");
 
-  router.post('/', auth, multer, bookCtrl.createBook);
+  router.post('/', auth, multer, convertImageToWebP, bookCtrl.createBook);
   router.get('/bestrating', bookCtrl.bestRating);
   router.get('/:id', bookCtrl.getOneBook);
   router.put('/:id', auth, multer, convertImageToWebP, bookCtrl.modifyBook);
