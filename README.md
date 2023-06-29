@@ -12,4 +12,4 @@ Installer le projet :
 -	npm install multer
 -	npm install mongodb
 -	npm install sharp (pour convertir des images en webP)
--	npm install validator (pour vérifier une adresse mail)
+
