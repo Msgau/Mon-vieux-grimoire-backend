@@ -1,20 +1,34 @@
 const Book = require('../models/Book');
 const fs = require('fs');
 
+function deletePic (book){ // Fonction de suppression d'image.
+  const filename = book.imageUrl.split("/images/")[1]; // On utilise split pour recréer le chemin dans notre système de fichier à partir de l'url de l'ancienne image
+  fs.unlink(`images/${filename}`, (err) => { // On utilise la méthode unlink de fs (file system, un package node) avec notre chemin pour supprimer l'ancienne image
+    if (err) {
+      console.error(err);
+    }
+  });
+}
+
 exports.createBook = (req, res, next) => {
   const bookObject = JSON.parse(req.body.book);
   delete bookObject._id; // On supprime l'id du post parce que sinon ça va pas matcher avec le fichier Book.js
   delete bookObject._userId;
-
-  if (isNaN(bookObject.year)) {
-    return res.status(400).json({ error: "Le champ 'year' doit être un nombre" });
-  }
 
     const book = new Book({
       ...bookObject, // L'opérateur spread ... est utilisé pour faire une copie de tous les éléments de bookObject (req.body moins les deux champs supprimés). 
       userId: req.auth.userId,
       imageUrl: `${req.protocol}://${req.get("host")}/images/${req.file.filename}.webp`, // On génère l'URL avec le protocole, le nom d'hôte, et la route avec le nom du fichier donné par multer
     });
+
+    if (isNaN(bookObject.year)) {
+      deletePic(book);
+      return res.status(400).json({ error: "Le champ 'year' doit être un nombre" });
+    }
+    if (book.year.toString().length !== 4) {
+      deletePic(book);
+      return res.status(400).json({ error: "L'année doit contenir 4 chiffres" });
+    }
 
     book
       .save() // La méthode save enregistre l'objet dans la base, et retourne un promise.
@@ -29,10 +43,7 @@ exports.createBook = (req, res, next) => {
 };
 
 exports.modifyBook = (req, res, next) => { 
-  // Vérifier si la conversion a réussi
-  if (!req.file || !req.file.path || !req.file.path.endsWith('.webp')) {
-    return res.status(500).json({ error: "Erreur lors de la conversion de l'image" });
-  }
+
   const bookObject = req.file // On crée un objet bookObject qui regarde si la requête est faite avec un fichier (req.file) ou pas.
     ? {
       
@@ -42,21 +53,23 @@ exports.modifyBook = (req, res, next) => {
     : { ...req.body }; // S'il n'y a pas d'objet de transmis, on récupère l'objet dans le corps de la requête.
 
   delete bookObject._userId; // on supprime l'userID provenant de la requête pour pas qu'il le modifie en le réassignant à un autre user
+  if (isNaN(bookObject.year)) {
+    deletePic(book);
+    return res.status(400).json({ error: "Le champ 'year' doit être un nombre" });
+  }
+  if (bookObject.year.toString().length !== 4) {
+    deletePic(book);
+    return res.status(400).json({ error: "L'année doit contenir 4 chiffres" });
+  }
   Book.findOne({ _id: req.params.id }) // On cherche l'objet dans notre bdd pour vérifier si c'est bien l'utilisateur qui a créé l'objet qui veut le modifier.
-    .then((book) => {
+    .then((book) => {   
       if (book.userId != req.auth.userId) { // Si ça match pas, erreur
         res.status(401).json({ message: "Not authorized" }); 
       } else { // Si ça marche, on met à jour notre enregistrement
         
         // Supprimer l'ancienne image si elle existe
-        if (book.imageUrl) { // Si le livre présent dans la bdd a une url d'image
-          
-          const filename = book.imageUrl.split("/images/")[1]; // On utilise split comme dans la fonction delete pour recréer le chemin dans notre système de fichier à partir de l'url de l'ancienne image
-          fs.unlink(`images/${filename}`, (err) => { // On utilise la méthode unlink de fs (file system, un package node) avec notre chemin pour supprimer l'ancienne image
-            if (err) {
-              console.error(err);
-            }
-          });
+        if (book.imageUrl && req.file) { // Si le livre présent dans la bdd a une url d'image
+          deletePic(book);
         }
         
         // La méthode updateOne permet de modifier un Thing dans la bdd. 
@@ -104,14 +117,12 @@ exports.deleteBook = (req, res, next) => {
       if (book.userId != req.auth.userId) { // On vérifie l'id comme pour le modify
         res.status(401).json({ message: "Not authorized" });
       } else { // Si c'est le bon utilisateur, on supprime l'objet de la bdd, et l'image du système de fichier
-        const filename = book.imageUrl.split("/images/")[1]; // On récupère l'url enregistrée, et on recrée le chemin dans notre système de fichier à aprtir de celle-ci (l'inverse du post)
-        fs.unlink(`images/${filename}`, () => { // On utilise la méthode unlink de fs (file system, un package node) avec notre chemin pour supprimer l'ancienne image du serveur.
+        deletePic(book);
           Book.deleteOne({ _id: req.params.id }) // On utilise la méthode deleteOne et on fait comme pour les autres.
             .then(() => {
               res.status(200).json({ message: "Objet supprimé !" });
             })
             .catch((error) => res.status(401).json({ error }));
-        });
       }
     })
     .catch((error) => {
