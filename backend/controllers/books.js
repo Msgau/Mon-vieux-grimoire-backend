@@ -2,6 +2,7 @@ const Book = require('../models/Book');
 const fs = require('fs');
 
 function deletePic (book){ // Fonction de suppression d'image.
+  console.log("fef");
   const filename = book.imageUrl.split("/images/")[1]; // On utilise split pour recréer le chemin dans notre système de fichier à partir de l'url de l'ancienne image
   fs.unlink(`images/${filename}`, (err) => { // On utilise la méthode unlink de fs (file system, un package node) avec notre chemin pour supprimer l'ancienne image
     if (err) {
@@ -53,14 +54,14 @@ exports.modifyBook = (req, res, next) => {
     : { ...req.body }; // S'il n'y a pas d'objet de transmis, on récupère l'objet dans le corps de la requête.
 
   delete bookObject._userId; // on supprime l'userID provenant de la requête pour pas qu'il le modifie en le réassignant à un autre user
+
   if (isNaN(bookObject.year)) {
-    deletePic(book);
-    return res.status(400).json({ error: "Le champ 'year' doit être un nombre" });
-  }
+    deletePic(bookObject);
+    return res.status(400).json({ error: "Le champ 'year' doit être un nombre" });}
   if (bookObject.year.toString().length !== 4) {
-    deletePic(book);
-    return res.status(400).json({ error: "L'année doit contenir 4 chiffres" });
-  }
+    deletePic(bookObject);
+    return res.status(400).json({ error: "L'année doit contenir 4 chiffres" });}
+
   Book.findOne({ _id: req.params.id }) // On cherche l'objet dans notre bdd pour vérifier si c'est bien l'utilisateur qui a créé l'objet qui veut le modifier.
     .then((book) => {   
       if (book.userId != req.auth.userId) { // Si ça match pas, erreur
@@ -68,8 +69,8 @@ exports.modifyBook = (req, res, next) => {
       } else { // Si ça marche, on met à jour notre enregistrement
         
         // Supprimer l'ancienne image si elle existe
-        if (book.imageUrl && req.file) { // Si le livre présent dans la bdd a une url d'image
-          deletePic(book);
+        if (book.imageUrl && req.file) { // Si le livre présent dans la bdd a une url d'image et qu'une nouvelle image est envoyée
+          deletePic(book); // On supprime l'ancienne image du serveur
         }
         
         // La méthode updateOne permet de modifier un Thing dans la bdd. 
@@ -117,7 +118,7 @@ exports.deleteBook = (req, res, next) => {
       if (book.userId != req.auth.userId) { // On vérifie l'id comme pour le modify
         res.status(401).json({ message: "Not authorized" });
       } else { // Si c'est le bon utilisateur, on supprime l'objet de la bdd, et l'image du système de fichier
-        deletePic(book);
+        deletePic(book); // Suppression de l'image du serveur
           Book.deleteOne({ _id: req.params.id }) // On utilise la méthode deleteOne et on fait comme pour les autres.
             .then(() => {
               res.status(200).json({ message: "Objet supprimé !" });
@@ -129,7 +130,7 @@ exports.deleteBook = (req, res, next) => {
       res.status(500).json({ error });
     });
 };
- 
+
 exports.rateOneBook = async (req, res) => {
   try {
     const book = await Book.findOne({ _id: req.params.id });
